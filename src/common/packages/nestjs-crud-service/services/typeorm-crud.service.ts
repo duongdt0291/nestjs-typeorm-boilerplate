@@ -92,14 +92,6 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return this.dbName === 'postgres' ? 'ILIKE' : 'LIKE';
   }
 
-  findByPk(id: number | string) {
-    return this.repository.findOne(id);
-  }
-
-  findByPkOrFail(id: number | string) {
-    return this.repository.findOneOrFail(id);
-  }
-
   findOne(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
     const builder = this.createBuilder(query, false, queryOptions);
 
@@ -145,6 +137,26 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
 
   async updateMany(criteria: FindOneActionDto<Entity>, dto: UpdateDto) {
     return this.createBuilder(criteria, false).update().set(dto).execute();
+  }
+
+  async delete(id: number | string) {
+    const entity = await this.repository.findOneOrFail(id);
+
+    return this.repository.remove(entity);
+  }
+
+  async deleteMany(conditions: FindCondition<Entity>) {
+    // this.createBuilder.delete()
+  }
+
+  async softDelete(id: number | string) {
+    if (!this.entityHasDeleteColumn) {
+      throw new Error('Be sure you declared DeleteDateColumn in schema');
+    }
+
+    const entity = await this.repository.findOneOrFail(id);
+
+    return this.repository.softRemove(entity);
   }
 
   /*

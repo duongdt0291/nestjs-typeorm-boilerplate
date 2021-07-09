@@ -26,7 +26,8 @@ export interface ServicePopulateOptions {
   /*
    * Map type:
    * - relations: have relations declare in entity, use decorator OneToMany, ManyToMany, OneToOne
-   * - mapOne:
+   * - mapOne: use when 2 entities have relation, but u dont want to declare relation (not use FK). This will join 2 table
+   * based onConditions.
    * - mapMany:
    */
   type: 'relation' | 'mapOne' | 'mapMany';

@@ -1,0 +1,1 @@
+export const INJECT_AUTH_INFO = '$INJECT-AUTH-INFO';

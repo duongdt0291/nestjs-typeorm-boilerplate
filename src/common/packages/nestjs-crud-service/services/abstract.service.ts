@@ -3,10 +3,6 @@ import { GetPaginatedManyDefaultResponse } from '../dto/get-paginated-many-respo
 import { FindCondition } from '../interfaces';
 
 export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, DetailDto = E> {
-  abstract findByPk(id: number | string): Promise<DetailDto>;
-
-  abstract findByPkOrFail(id: any): Promise<DetailDto>;
-
   abstract findOne(query: FindOneActionDto<E>): Promise<DetailDto>;
 
   abstract findOneOrFail(query: FindOneActionDto<E>): Promise<DetailDto>;

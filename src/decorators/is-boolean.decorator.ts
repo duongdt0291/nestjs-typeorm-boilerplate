@@ -8,7 +8,7 @@ export const IsBoolean = (
     defaultValue,
   }: {
     convert: boolean;
-    defaultValue?: string;
+    defaultValue?: boolean;
   },
   options?: ValidationOptions,
 ) =>
