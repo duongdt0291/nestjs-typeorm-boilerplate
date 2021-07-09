@@ -1,5 +1,6 @@
 import { INTERCEPTORS_METADATA } from '@nestjs/common/constants';
 import { INJECT_AUTH_INFO } from 'src/common/constants';
+import { isArrayNotEmpty } from 'src/common/packages/nestjs-crud-service/utils';
 import { InjectAuthInfoInterceptor } from 'src/interceptors';
 
 export interface InjectAuthInfoOptions {
@@ -27,6 +28,14 @@ export interface InjectAuthInfoOptions {
 }
 
 export const InjectAuthInfo = (options: InjectAuthInfoOptions) => (target: any) => {
+  if (isArrayNotEmpty(options.queryAction) && !options.query) {
+    throw new Error('Property query not found');
+  }
+
+  if (isArrayNotEmpty(options.bodyAction) && !options.body) {
+    throw new Error('Property body not found');
+  }
+
   Reflect.defineMetadata(INJECT_AUTH_INFO, options, target);
-  Reflect.defineMetadata(INTERCEPTORS_METADATA, InjectAuthInfoInterceptor, target);
+  Reflect.defineMetadata(INTERCEPTORS_METADATA, [InjectAuthInfoInterceptor], target);
 };
