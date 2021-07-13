@@ -1,6 +1,7 @@
 import { MapInterceptor } from '@automapper/nestjs';
 import { Body, Get, Param, Put, UseInterceptors } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
+import { FindManyActionDto } from 'src/common/packages/nestjs-crud-service/dto';
 import { ApiController, Auth } from 'src/decorators';
 import { UserDto } from './dto';
 import { User } from './entities/user.entity';
@@ -17,15 +18,15 @@ export class UserController {
   //     isArray: true,
   //   }),
   // )
-  list(@Body() query) {
-    return this.userService.list(query);
+  list(@Body() query: FindManyActionDto<User>) {
+    return this.userService.test(query);
   }
 
   @Get(':id')
   @Auth('admin')
   @UseInterceptors(MapInterceptor(UserDto, User))
-  findOne(@Param('id') id: number | string) {
-    return this.userService.findByPk(id);
+  findOne(@Param('id') id: number) {
+    return this.userService.findOne({ where: { id } });
   }
 
   @Put(':id')

@@ -38,7 +38,6 @@ export class FindOneActionDto<E> {
   @ApiPropertyOptional()
   @IsObject()
   @IsOptional()
-  @IsOptional()
   sort?: SortOptions;
 
   @ApiPropertyOptional()

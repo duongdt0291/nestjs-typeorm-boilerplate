@@ -145,8 +145,10 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return this.repository.remove(entity);
   }
 
-  async deleteMany(conditions: FindCondition<Entity>) {
-    // this.createBuilder.delete()
+  async deleteMany(criteria: FindOneActionDto<Entity>) {
+    const entities = await this.createBuilder(criteria, false).getMany();
+
+    return this.repository.remove(entities);
   }
 
   async softDelete(id: number | string) {
@@ -302,7 +304,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   protected getAllowedPopulation(queryPopulateOptions: QueryPopulateOptions[], source: any = this.populationMetadata) {
     const allow: MergedPopulateOptions[] = [];
 
-    if (!queryPopulateOptions?.length) {
+    if (!queryPopulateOptions?.length && source?.length) {
       return this.getAllowedPopulation(source, source);
     }
 
