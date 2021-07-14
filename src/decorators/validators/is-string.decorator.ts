@@ -29,7 +29,7 @@ export const IsString = (
 
     trim?: boolean;
     lowercase?: boolean;
-  },
+  } = {},
   options?: ValidationOptions,
 ) => {
   const decorators = [];

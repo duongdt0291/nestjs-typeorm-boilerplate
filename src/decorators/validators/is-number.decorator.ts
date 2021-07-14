@@ -28,7 +28,7 @@ export const IsNumber = (
     positive?: boolean;
     negative?: boolean;
     integer?: boolean;
-  },
+  } = {},
   numberOptions?: IsNumberOptions,
 ) => {
   const decorators = [];

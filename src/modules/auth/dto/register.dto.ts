@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEmail } from 'class-validator';
+import { IsNumber, IsString } from 'src/decorators';
 
 export class RegisterDto {
   @ApiProperty()
@@ -19,7 +20,6 @@ export class RegisterDto {
   lastName: string;
 
   @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
+  @IsNumber({ optional: true, positive: true, integer: true })
   age?: number;
 }

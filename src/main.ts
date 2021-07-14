@@ -11,6 +11,7 @@ async function bootstrap() {
   app.use(helmet());
   app.useGlobalPipes(
     new ValidationPipe({
+      transform: true,
       whitelist: true, // remove all props, which not defined in dto
     }),
   );

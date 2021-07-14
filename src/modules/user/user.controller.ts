@@ -19,7 +19,7 @@ export class UserController {
   //   }),
   // )
   list(@Body() query: FindManyActionDto<User>) {
-    return this.userService.test(query);
+    return this.userService.list(query);
   }
 
   @Get(':id')

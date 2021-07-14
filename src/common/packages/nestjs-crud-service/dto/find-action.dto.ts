@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsArray, IsOptional } from 'class-validator';
+import { IsEnum, IsNumber, IsObjectString, IsString } from 'src/decorators';
 import { FindCondition } from '../interfaces/query-operator.interface';
 
 export type SortOptions = { [index: string]: 'ASC' | 'DESC' };
@@ -21,8 +22,8 @@ export class PopulateItemObject {
 export type PopulateItem = string | PopulateItemObject;
 
 export class FindOneActionDto<E> {
-  @ApiProperty()
-  @IsObject()
+  @ApiProperty({ type: 'string' })
+  @IsObjectString({ optional: true })
   where: FindCondition<E>;
 
   @ApiPropertyOptional()
@@ -36,35 +37,37 @@ export class FindOneActionDto<E> {
   fields?: string[];
 
   @ApiPropertyOptional()
-  @IsObject()
-  @IsOptional()
+  @IsObjectString({ optional: true })
   sort?: SortOptions;
 
   @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
+  @IsString({ optional: true })
   search?: string;
 
   @ApiPropertyOptional()
+  @IsArray()
   @IsOptional()
   searchFields?: string[];
 
   @ApiPropertyOptional({ enum: SearchType })
-  @IsEnum(SearchType)
-  @IsOptional()
-  searchCriteria?: SearchType = SearchType.Contains;
+  @IsEnum({ entity: SearchType, defaultValue: SearchType.Contains })
+  searchCriteria?: SearchType;
 }
 
 export class FindManyActionDto<E> extends FindOneActionDto<E> {
   @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  @IsPositive()
+  @IsNumber({
+    optional: true,
+    positive: true,
+    integer: true,
+  })
   pageSize?: number;
 
   @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  @IsPositive()
+  @IsNumber({
+    optional: true,
+    positive: true,
+    integer: true,
+  })
   page?: number;
 }

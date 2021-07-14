@@ -7,9 +7,9 @@ export const IsBoolean = (
     convert,
     defaultValue,
   }: {
-    convert: boolean;
+    convert?: boolean;
     defaultValue?: boolean;
-  },
+  } = {},
   options?: ValidationOptions,
 ) =>
   applyDecorators(

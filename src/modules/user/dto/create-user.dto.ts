@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsString } from 'class-validator';
-import { IsNumber } from 'src/decorators/is-number.decorator';
+import { IsEmail } from 'class-validator';
+import { IsNumber, IsString } from 'src/decorators';
 
 export class CreateUserDto {
   @ApiProperty()

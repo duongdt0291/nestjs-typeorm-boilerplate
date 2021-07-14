@@ -9,7 +9,7 @@ export const IsDate = (
   }: {
     optional?: boolean;
     convert?: boolean;
-  },
+  } = {},
   options?: ValidationOptions,
 ) => {
   const decorators = [];
