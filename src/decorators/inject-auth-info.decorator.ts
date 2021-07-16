@@ -10,7 +10,7 @@ export interface InjectAuthInfoOptions {
   property: string;
 
   /*
-   * handler's name, which will add info from query function below to req.query
+   * handler's name, which will add info from query function below to req.query.where
    */
   queryAction?: string[];
 

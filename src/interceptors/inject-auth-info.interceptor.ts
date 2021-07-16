@@ -10,7 +10,13 @@ export class InjectAuthInfoInterceptor implements NestInterceptor {
     const options = <InjectAuthInfoOptions>Reflect.getMetadata(INJECT_AUTH_INFO, ctrl);
 
     if (options.queryAction && options.queryAction.includes(handler.name)) {
-      Object.assign(req.query, options.query(req[options.property]));
+      if (!req.query?.where) {
+        req.query.where = {};
+      } else if (typeof req.query?.where === 'string') {
+        req.query.where = JSON.parse(req.query.where);
+      }
+
+      Object.assign(req.query.where, options.query(req[options.property]));
     } else if (options.bodyAction && options.bodyAction.includes(handler.name)) {
       Object.assign(req.body, options.body(req[options.property]));
     }
