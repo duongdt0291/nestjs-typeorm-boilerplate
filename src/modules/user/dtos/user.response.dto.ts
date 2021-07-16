@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { AbstractDto } from 'src/common/dto/abstract.dto';
 import { Tag } from '../entities';
 
-export class UserDto extends AbstractDto {
+export class UserResponseDto extends AbstractDto {
   @ApiProperty()
   @AutoMap()
   firstName: string;

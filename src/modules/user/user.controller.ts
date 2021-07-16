@@ -3,7 +3,7 @@ import { Body, Get, Param, Put, UseInterceptors } from '@nestjs/common';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { FindManyActionDto } from 'src/common/packages/nestjs-crud-service/dto';
 import { ApiController, Auth } from 'src/decorators';
-import { UserDto } from './dto';
+import { UserResponseDto } from './dtos';
 import { User } from './entities/user.entity';
 import { UserService } from './user.service';
 
@@ -14,7 +14,7 @@ export class UserController {
   @Get()
   // TODO: xử lý mapper
   // @UseInterceptors(
-  //   MapInterceptor(UserDto, User, {
+  //   MapInterceptor(UserResponseDto, User, {
   //     isArray: true,
   //   }),
   // )
@@ -24,7 +24,7 @@ export class UserController {
 
   @Get(':id')
   @Auth('admin')
-  @UseInterceptors(MapInterceptor(UserDto, User))
+  @UseInterceptors(MapInterceptor(UserResponseDto, User))
   findOne(@Param('id') id: number) {
     return this.userService.findOne({ where: { id } });
   }
@@ -32,9 +32,9 @@ export class UserController {
   @Put(':id')
   @Auth('admin')
   @ApiOkResponse({
-    type: UserDto,
+    type: UserResponseDto,
   })
-  @UseInterceptors(MapInterceptor(UserDto, User))
+  @UseInterceptors(MapInterceptor(UserResponseDto, User))
   update(@Param('id') id: number | string, @Body() updateUserDto) {
     return this.userService.update(+id, updateUserDto);
   }

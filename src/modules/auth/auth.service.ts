@@ -3,11 +3,11 @@ import { Mapper } from '@automapper/types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
-import { UserDto } from '../user/dto';
+import { UserResponseDto } from '../user/dtos';
 import { User } from '../user/entities';
 import { UserService } from '../user/user.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dtos/login.dto';
+import { RegisterDto } from './dtos/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -34,7 +34,7 @@ export class AuthService {
       throw new NotFoundException('Email hoặc mật khẩu không chính xác');
     }
 
-    return this.mapper.map(user, UserDto, User);
+    return this.mapper.map(user, UserResponseDto, User);
   }
 
   async register(registerDto: RegisterDto) {

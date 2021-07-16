@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ServicePopulateOptions } from 'src/common/packages/nestjs-crud-service/interfaces/service-populate-options.interface';
 import { TypeOrmCrudService } from 'src/common/packages/nestjs-crud-service/services';
 import { Repository } from 'typeorm';
-import { CreateUserDto, UpdateUserDto } from './dto';
+import { CreateUserDto, UpdateUserDto } from './dtos';
 import { User } from './entities/user.entity';
 
 @Injectable()
@@ -29,9 +29,9 @@ export class UserService extends TypeOrmCrudService<User, CreateUserDto, UpdateU
   ];
 
   constructor(
+    @InjectMapper() private readonly mapper: Mapper,
     @InjectRepository(User)
     repository: Repository<User>,
-    @InjectMapper() private readonly mapper: Mapper,
   ) {
     super(repository);
   }
