@@ -10,45 +10,40 @@ import {
 } from 'class-validator';
 
 export const IsString = (
-  {
-    optional,
-    defaultValue,
-    minLength,
-    maxLength,
-    pattern,
-    trim,
-    lowercase,
-  }: {
+  options: {
     optional?: boolean;
     defaultValue?: string;
-
     minLength?: number;
     maxLength?: number;
-
     pattern?: string;
-
     trim?: boolean;
     lowercase?: boolean;
   } = {},
-  options?: ValidationOptions,
+  stringOptions?: ValidationOptions,
 ) => {
   const decorators = [];
+
+  const { optional, defaultValue, minLength, maxLength, pattern, trim, lowercase } = Object.assign(
+    { trim: true },
+    options,
+  );
+
   if (optional) {
     decorators.push(IsOptional());
   }
   decorators.push(
     Transform(({ value }) => {
-      const v = String(value) || defaultValue;
+      let v = String(value) || defaultValue;
       if (!v) {
         return v;
       }
 
       if (trim) {
-        v.trim();
+        v = v.trim();
       }
 
       if (lowercase) {
-        v.toLowerCase();
+        v = v.toLowerCase();
       }
 
       return v;
@@ -67,5 +62,5 @@ export const IsString = (
     decorators.push(MaxLength(maxLength));
   }
 
-  return applyDecorators(...decorators, IsStringOriginal(options));
+  return applyDecorators(...decorators, IsStringOriginal(stringOptions));
 };
