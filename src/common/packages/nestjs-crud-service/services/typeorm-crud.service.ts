@@ -304,8 +304,12 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   protected getAllowedPopulation(queryPopulateOptions: QueryPopulateOptions[], source: any = this.populationMetadata) {
     const allow: MergedPopulateOptions[] = [];
 
-    if (!queryPopulateOptions?.length && source?.length) {
-      return this.getAllowedPopulation(source, source);
+    if (!queryPopulateOptions?.length) {
+      if (source?.length) {
+        return this.getAllowedPopulation(source, source);
+      }
+
+      return [];
     }
 
     queryPopulateOptions.forEach((queryOption) => {
