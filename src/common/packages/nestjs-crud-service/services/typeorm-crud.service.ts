@@ -92,66 +92,72 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return this.dbName === 'postgres' ? 'ILIKE' : 'LIKE';
   }
 
-  findOne(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
+  baseFindOne(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
     const builder = this.createBuilder(query, false, queryOptions);
 
     return builder.getOne();
   }
 
-  findOneOrFail(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
+  baseFindOneOrFail(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
     const builder = this.createBuilder(query, false, queryOptions);
 
     return builder.getOneOrFail();
   }
 
-  find(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
+  baseFind(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
     const builder = this.createBuilder(query, true, queryOptions);
 
     return builder.getMany();
   }
 
-  async list(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
+  async baseList(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
     const builder = this.createBuilder(query, true, queryOptions);
     const [data, total] = await builder.getManyAndCount();
 
     return this.createPaginationBuilder<Entity>(data, total, query.pageSize, query.page);
   }
 
-  create(createDto: CreateDto) {
+  baseCreate(createDto: CreateDto) {
     const entity = this.repository.create(createDto);
 
     return this.repository.save(entity);
   }
 
-  async update(id: number | string, updateDto: UpdateDto) {
+  async baseUpdate(id: number | string, updateDto: UpdateDto) {
     const entity = await this.repository.findOneOrFail(id);
 
     return this.repository.save(merge(entity, updateDto) as Entity);
   }
 
-  async replace(updateDto: UpdateDto) {
-    const entity = await this.repository.findOneOrFail((updateDto as any).id);
+  async baseUpdateOne(criteria: FindOneActionDto<Entity>, updateDto: UpdateDto) {
+    const entity = await this.createBuilder(criteria).getOneOrFail();
 
-    return this.repository.save(merge(entity, updateDto));
+    return this.repository.save(merge(entity, updateDto) as Entity);
   }
 
-  async updateMany(criteria: FindOneActionDto<Entity>, dto: UpdateDto) {
+  async baseUpdateMany(criteria: FindOneActionDto<Entity>, dto: UpdateDto) {
     return this.createBuilder(criteria, false).update().set(dto).execute();
   }
 
-  async delete(id: number | string) {
+  async baseDelete(id: number | string) {
     const entity = await this.repository.findOneOrFail(id);
 
     return this.repository.remove(entity);
   }
 
-  async deleteMany(criteria: FindOneActionDto<Entity>) {
+  async baseDeleteOne(criteria: FindOneActionDto<Entity>) {
+    const entity = await this.createBuilder(criteria, false).getOneOrFail();
+
+    return this.repository.remove(entity);
+  }
+
+  async baseDeleteMany(criteria: FindOneActionDto<Entity>) {
     const entities = await this.createBuilder(criteria, false).getMany();
 
     return this.repository.remove(entities);
   }
 
-  async softDelete(id: number | string) {
+  async baseSoftDelete(id: number | string) {
     if (!this.entityHasDeleteColumn) {
       throw new Error('Be sure you declared DeleteDateColumn in schema');
     }
@@ -164,7 +170,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   /*
    * Only update for given entity, not for relation entity
    */
-  increment(conditions: FindCondition<Entity>, value: { [key in keyof Entity]?: number }) {
+  baseIncrement(conditions: FindCondition<Entity>, value: { [key in keyof Entity]?: number }) {
     if (!Object.entries(value)?.length) {
       throw new BadRequestException();
     }

@@ -1,17 +1,41 @@
-import { FindOneActionDto } from '../dto';
+import { UpdateResult } from 'typeorm';
+import { FindManyActionDto, FindOneActionDto } from '../dto';
 import { GetPaginatedManyDefaultResponse } from '../dto/get-paginated-many-response.dto';
-import { FindCondition } from '../interfaces';
+import { FindCondition, QueryOptions } from '../interfaces';
 
 export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, DetailDto = E> {
-  abstract findOne(query: FindOneActionDto<E>): Promise<DetailDto>;
+  abstract baseFindOne(query: FindOneActionDto<E>, queryOptions?: QueryOptions): Promise<DetailDto>;
 
-  abstract findOneOrFail(query: FindOneActionDto<E>): Promise<DetailDto>;
+  findOne(query: FindOneActionDto<E>, queryOptions?: QueryOptions) {
+    return this.baseFindOne(query, queryOptions);
+  }
 
-  abstract find(query: any): Promise<DetailDto[]>;
+  abstract baseFindOneOrFail(query: FindOneActionDto<E>, queryOptions?: QueryOptions): Promise<DetailDto>;
 
-  //   abstract list(query: any): Promise<T[]>;
+  findOneOrFail(query: FindOneActionDto<E>, queryOptions?: QueryOptions) {
+    return this.baseFindOneOrFail(query, queryOptions);
+  }
 
-  abstract create(createDto: CreateDto): Promise<DetailDto>;
+  abstract baseFind(query: FindManyActionDto<E>, queryOptions?: QueryOptions): Promise<DetailDto[]>;
+
+  find(query: FindManyActionDto<E>, queryOptions?: QueryOptions) {
+    return this.baseFind(query, queryOptions);
+  }
+
+  abstract baseList(
+    query: FindManyActionDto<E>,
+    queryOptions?: QueryOptions,
+  ): Promise<GetPaginatedManyDefaultResponse<E>>;
+
+  async list(query: FindManyActionDto<E>, queryOptions?: QueryOptions) {
+    return this.baseList(query, queryOptions);
+  }
+
+  abstract baseCreate(createDto: CreateDto): Promise<DetailDto>;
+
+  create(createDto: CreateDto) {
+    return this.baseCreate(createDto);
+  }
 
   // abstract bulkCreate({
   //   entities,
@@ -19,24 +43,56 @@ export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, D
   //   entities: CreateDto[];
   // }): Promise<DetailDto[]>;
 
-  abstract update(id: string | number, updateDto: UpdateDto): Promise<E>;
+  abstract baseUpdate(id: string | number, updateDto: UpdateDto): Promise<E>;
 
-  // updateOne
+  update(id: string | number, updateDto: UpdateDto) {
+    return this.baseUpdate(id, updateDto);
+  }
 
-  // updateMany
+  abstract baseUpdateOne(criteria: FindOneActionDto<E>, updateDto: UpdateDto): Promise<E>;
 
-  // delete
+  updateOne(criteria: FindOneActionDto<E>, updateDto: UpdateDto) {
+    return this.baseUpdateOne(criteria, updateDto);
+  }
 
-  // deleteOne
+  abstract baseUpdateMany(criteria: FindOneActionDto<E>, dto: UpdateDto): Promise<UpdateResult>;
 
-  // deleteMany
+  async updateMany(criteria: FindOneActionDto<E>, dto: UpdateDto) {
+    return this.baseUpdateMany(criteria, dto);
+  }
 
-  // abstract softDelete(conditions: FindCondition<E>): Promise<any>;
+  abstract baseDelete(id: number | string): Promise<E>;
 
-  abstract increment(
+  async delete(id: number | string) {
+    return this.baseDelete(id);
+  }
+
+  abstract baseDeleteOne(criteria: FindOneActionDto<E>): Promise<E>;
+
+  deleteOne(criteria: FindOneActionDto<E>) {
+    return this.baseDeleteOne(criteria);
+  }
+
+  abstract baseDeleteMany(criteria: FindOneActionDto<E>): Promise<E[]>;
+
+  deleteMany(criteria: FindOneActionDto<E>) {
+    return this.baseDeleteMany(criteria);
+  }
+
+  abstract baseSoftDelete(id: number | string): Promise<E>;
+
+  async softDelete(id: number | string) {
+    return this.baseSoftDelete(id);
+  }
+
+  abstract baseIncrement(
     conditions: FindCondition<E>,
     update: { [index: string]: number },
   ): Promise<{ success: boolean; affected: number }>;
+
+  increment(conditions: FindCondition<E>, update: { [index: string]: number }) {
+    return this.baseIncrement(conditions, update);
+  }
 
   /**
    * Wrap page into page-info

@@ -1,1 +1,3 @@
 export const INJECT_AUTH_INFO = '$INJECT-AUTH-INFO';
+
+export const SERVICE_METADATA = Symbol('SERVICE_METADATA');
