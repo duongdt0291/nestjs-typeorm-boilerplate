@@ -3,12 +3,15 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ApiConfigService } from './modules/shared/services/api-config.service';
+import { SharedModule } from './modules/shared/shared.module';
 import { setupSwagger } from './swagger-setup';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.use(helmet());
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -16,8 +19,13 @@ async function bootstrap() {
     }),
   );
 
-  setupSwagger(app);
+  const configService = app.select(SharedModule).get(ApiConfigService);
 
-  await app.listen(3000);
+  if (!configService.documentationEnabled) {
+    setupSwagger(app);
+  }
+
+  await app.listen(configService.appConfig.port);
 }
+
 bootstrap();

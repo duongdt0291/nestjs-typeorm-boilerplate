@@ -1,14 +1,14 @@
-import { Module } from '@nestjs/common';
-import { UserModule } from './modules/user/user.module';
-import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
-import { AuthModule } from './modules/auth/auth.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { config } from './config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { AutomapperModule } from '@automapper/nestjs';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { SnakeNamingStrategy } from './snake-naming-strategy';
+import { AuthModule } from './modules/auth/auth.module';
+import { ApiConfigService } from './modules/shared/services/api-config.service';
+import { SharedModule } from './modules/shared/shared.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -19,20 +19,15 @@ import { SnakeNamingStrategy } from './snake-naming-strategy';
     ConfigModule.forRoot({
       envFilePath: ['.env'],
       isGlobal: true,
-      load: [config],
     }),
     ThrottlerModule.forRoot({
       ttl: 60,
       limit: 100,
     }),
     TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        ...configService.get('database'),
-        namingStrategy: new SnakeNamingStrategy(),
-        entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
-        logging: ['query', 'error', 'info', 'log'],
-      }),
+      imports: [SharedModule],
+      useFactory: (configService: ApiConfigService) => configService.typeOrmConfig,
+      inject: [ApiConfigService],
     }),
     UserModule,
     AuthModule,
