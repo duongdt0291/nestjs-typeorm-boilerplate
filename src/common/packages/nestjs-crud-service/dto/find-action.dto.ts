@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsArray, IsOptional } from 'class-validator';
 import { IsEnum, IsNumber, IsObjectString, IsString } from 'src/decorators';
 import { FindCondition } from '../interfaces/query-operator.interface';
@@ -12,7 +13,7 @@ export enum SearchType {
 }
 
 export class PopulateItemObject {
-  name: string;
+  property: string;
 
   // onConditions?: FindCondition<any>;
 
@@ -29,6 +30,11 @@ export class FindOneActionDto<E> {
   @ApiPropertyOptional()
   @IsArray()
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return;
+
+    return value.map((e) => JSON.parse(e));
+  })
   populates?: PopulateItem[];
 
   @ApiPropertyOptional()

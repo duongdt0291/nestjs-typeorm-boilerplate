@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { snakeCase } from 'change-case';
 import { isNotEmptyObject } from 'class-validator';
 import { intersection, isNil, isObject, merge, set } from 'lodash';
 import {
@@ -11,6 +12,7 @@ import {
   WhereExpression,
 } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { DefaultPageSize } from '../constant';
 import { FindManyActionDto, FindOneActionDto, PopulateItem, SortOptions } from '../dto';
 import { FindCondition, MergedPopulateOptions, QueryOperator, QueryOptions, QueryPopulateOptions } from '../interfaces';
 import { ServicePopulateOptions } from '../interfaces/service-populate-options.interface';
@@ -92,6 +94,38 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return this.dbName === 'postgres' ? 'ILIKE' : 'LIKE';
   }
 
+  /*
+   * Sử dụng trong trường hợp dùng camelCase ngoài code, nhưng bên trong typeorm vẫn generate ra snakeCase,
+   * do với các phương thức map (leftJoinAndMapOne/Many,...),
+   * khi generate điều kiện where, không thể dùng trường theo kiểu camelCase đã khai báo trong entity (typeorm sẽ ko biết để convert như các trường được khai báo bởi quan hệ: ManyToOne,...)
+   * mà phải dùng table alias của bảng cần join.
+   */
+  protected populateAliasMapper: Record<string, string>;
+
+  setPopulateAliasMapper() {
+    this.populateAliasMapper = this.populationMetadata
+      ? this.generatePopulateAliasMapper({}, this.populationMetadata)
+      : {};
+  }
+
+  generatePopulateAliasMapper(
+    res: Record<string, string>,
+    populationMetadata: ServicePopulateOptions[],
+    parentAlias?: string,
+  ) {
+    populationMetadata.forEach((population) => {
+      const alias = population.type === 'relation' ? population.property : population.tableAlias || population.table;
+
+      set(res, parentAlias ? `${parentAlias}.${population.property}` : population.property, alias);
+
+      if (population.populates) {
+        this.generatePopulateAliasMapper(res, population.populates, parentAlias ? `${parentAlias}.${alias}` : alias);
+      }
+    });
+
+    return res;
+  }
+
   baseFindOne(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
     const builder = this.createBuilder(query, false, queryOptions);
 
@@ -123,6 +157,10 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return this.repository.save(entity);
   }
 
+  baseBulkCreate({ entities }: { entities: CreateDto[] }) {
+    return this.repository.save(this.repository.create(entities));
+  }
+
   async baseUpdate(id: number | string, updateDto: UpdateDto) {
     const entity = await this.repository.findOneOrFail(id);
 
@@ -136,7 +174,9 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   }
 
   async baseUpdateMany(criteria: FindOneActionDto<Entity>, dto: UpdateDto) {
-    return this.createBuilder(criteria, false).update().set(dto).execute();
+    const entities = await this.createBuilder(criteria, false).getMany();
+
+    return entities.length ? this.repository.save(entities.map((e) => merge(e, dto))) : null;
   }
 
   async baseDelete(id: number | string) {
@@ -146,15 +186,15 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   }
 
   async baseDeleteOne(criteria: FindOneActionDto<Entity>) {
-    const entity = await this.createBuilder(criteria, false).getOneOrFail();
+    const entity = await this.createBuilder(criteria, false).getOne();
 
-    return this.repository.remove(entity);
+    return entity ? this.repository.remove(entity) : null;
   }
 
   async baseDeleteMany(criteria: FindOneActionDto<Entity>) {
     const entities = await this.createBuilder(criteria, false).getMany();
 
-    return this.repository.remove(entities);
+    return entities.length ? this.repository.remove(entities) : null;
   }
 
   async baseSoftDelete(id: number | string) {
@@ -177,7 +217,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
 
     const setObj: QueryDeepPartialEntity<Entity> = {};
 
-    Object.entries(value).forEach(([key, value]) => set(setObj, key, () => `${key} + ${value}`));
+    Object.entries(value).forEach(([key, value]) => set(setObj, key, () => `${snakeCase(key)} + ${value}`));
 
     const builder = this.repository.createQueryBuilder(this.tableAlias);
 
@@ -216,6 +256,10 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
       builder.addSelect(queryOptions.includeHiddenFields);
     }
 
+    if (!this.populateAliasMapper) {
+      this.setPopulateAliasMapper();
+    }
+
     this.setConditions(builder, query.where);
 
     if (query.search && isArrayNotEmpty(query.searchFields)) {
@@ -231,7 +275,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     }
 
     if (getMany) {
-      let take = query.pageSize || 100;
+      let take = query.pageSize || DefaultPageSize;
       const skip = take * ((query.page || 1) - 1);
 
       if (queryOptions?.maxLimit && take > queryOptions.maxLimit) {
@@ -250,9 +294,9 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   protected setPopulates(
     builder: SelectQueryBuilder<any>,
     populates: PopulateItem[] = [],
-    allowedPopulates: QueryPopulateOptions[] = [],
+    allowedPopulates: QueryPopulateOptions[],
   ) {
-    const allow = this.getAllowedPopulation(allowedPopulates);
+    const allow = this.getAllowedPopulation(allowedPopulates, this.populationMetadata);
 
     if (!allow.length) {
       return;
@@ -270,11 +314,11 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
       });
 
     p.forEach((populate) => {
-      this.setJoin(populate, builder);
+      this.setJoin(populate, builder, this.tableAlias);
     });
   }
 
-  setJoin(populate: any, builder: SelectQueryBuilder<Entity>, parentAlias = this.tableAlias) {
+  setJoin(populate: any, builder: SelectQueryBuilder<Entity>, parentAlias) {
     let args;
 
     if (populate.method.endsWith('Select')) {
@@ -284,13 +328,24 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
         populate.onConditions,
       ];
     } else {
-      args = [`${parentAlias}.${populate.property}`, populate.table, populate.tableAlias, populate.onConditions];
+      args = [
+        `${parentAlias}.${populate.property}`,
+        populate.table,
+        populate.tableAlias || populate.table,
+        populate.onConditions,
+      ];
     }
 
     (builder as any)[populate.method](...args);
 
     if (populate.populates) {
-      populate.populates.forEach((p) => this.setJoin(p, builder, populate.property));
+      populate.populates.forEach((p) =>
+        this.setJoin(
+          p,
+          builder,
+          populate && !populate.method.endsWith('Select') ? populate.tableAlias || populate.table : populate.property,
+        ),
+      );
     }
   }
 
@@ -307,10 +362,10 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return MapTypeJoin[`${type}_${required ? 'innerJoin' : 'leftJoin'}`];
   }
 
-  protected getAllowedPopulation(queryPopulateOptions: QueryPopulateOptions[], source: any = this.populationMetadata) {
+  protected getAllowedPopulation(queryPopulateOptions: QueryPopulateOptions[], source: any) {
     const allow: MergedPopulateOptions[] = [];
 
-    if (!queryPopulateOptions?.length) {
+    if (!queryPopulateOptions) {
       if (source?.length) {
         return this.getAllowedPopulation(source, source);
       }
@@ -318,11 +373,15 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
       return [];
     }
 
+    if (!queryPopulateOptions.length) {
+      return [];
+    }
+
     queryPopulateOptions.forEach((queryOption) => {
       const match = source.find((servicePopulateOption) => servicePopulateOption.property === queryOption.property);
 
       let childPopulates;
-      if (queryOption?.populates?.length && match?.populates?.length) {
+      if (queryOption?.populates?.length || match?.populates?.length) {
         childPopulates = this.getAllowedPopulation(queryOption.populates, match.populates);
       }
 
@@ -330,10 +389,11 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
         allow.push({
           ...match,
           populates: childPopulates,
-          required: hasOwnPropName(queryOption, 'eager') ? queryOption.eager : match.eager,
-          onConditions: queryOption.onConditions
-            ? `${match.onConditions} AND (${queryOption.onConditions})`
-            : match.onConditions,
+          required: hasOwnPropName(queryOption, 'required') ? queryOption.required : match.required,
+          onConditions:
+            queryOption.onConditions && queryOption.onConditions !== match.onConditions
+              ? `${match.onConditions} AND (${queryOption.onConditions})`
+              : match.onConditions,
           eager: hasOwnPropName(queryOption, 'eager') ? queryOption.eager : match.eager,
           method: this.getJoinMethod(match.type),
         });
@@ -346,45 +406,55 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   protected setConditions(
     builder: SelectQueryBuilder<Entity> | WhereExpression,
     conditions: FindCondition<any> | QueryOperator<any>,
+    parentPath = '',
     parentField: string = this.tableAlias,
     hasWhere = false,
   ) {
-    Object.entries(conditions).forEach(([field, value]) => {
-      const method = hasWhere ? 'andWhere' : 'where';
+    try {
+      Object.entries(conditions).forEach(([field, value]) => {
+        const method = hasWhere ? 'andWhere' : 'where';
 
-      if (field === '$or') {
-        return builder[method](new Brackets((b) => this.setOrCondition(b, value, parentField)));
-      }
+        if (field === '$or') {
+          return builder[method](new Brackets((b) => this.setOrCondition(b, value, parentPath, parentField)));
+        }
 
-      if (MapObjectOperator[field]) {
+        if (MapObjectOperator[field]) {
+          hasWhere = true;
+          const { str, params } = this.mapOperatorsToQuery(parentField, field, value);
+
+          return builder[method](str, params);
+        }
+
+        const cols = parentField.split('.');
+        switch (cols.length) {
+          case 1:
+            parentField = parentField;
+            break;
+          default:
+            parentField = cols[1];
+        }
+
+        if (isObject(value)) {
+          if (this.populateAliasMapper[parentPath ? `${parentPath}.${field}` : field]) {
+            field = this.populateAliasMapper[parentPath ? `${parentPath}.${field}` : field];
+          }
+          return this.setConditions(
+            builder as unknown as SelectQueryBuilder<Entity>,
+            value,
+            parentPath ? `${parentPath}.${field}` : field,
+            `${parentField}.${field}`,
+            true,
+          );
+        }
+
         hasWhere = true;
-        const { str, params } = this.mapOperatorsToQuery(parentField, field, value);
-        return builder[method](str, params);
-      }
-
-      const cols = parentField.split('.');
-      switch (cols.length) {
-        case 1:
-          parentField = parentField;
-          break;
-        default:
-          parentField = cols[1];
-      }
-
-      if (isObject(value)) {
-        return this.setConditions(
-          builder as unknown as SelectQueryBuilder<Entity>,
-          value,
-          `${parentField}.${field}`,
-          true,
-        );
-      }
-
-      hasWhere = true;
-      builder[method](`${parentField}.${field} = (:${parentField}.${field})`, {
-        [`${parentField}.${field}`]: value,
+        builder[method](`${parentField}.${field} = (:${parentField}.${field})`, {
+          [`${parentField}.${field}`]: value,
+        });
       });
-    });
+    } catch (error) {
+      throw error;
+    }
   }
 
   protected mapOperatorsToQuery(field: string, operator: string, value: any): { str: string; params: ObjectLiteral } {
@@ -441,7 +511,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
         str = `${fieldWithAlias} IS NULL`;
         params = {};
         break;
-      case '$notNull':
+      case '$isNotNull':
         str = `${fieldWithAlias} IS NOT NULL`;
         params = {};
         break;
@@ -503,16 +573,12 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   protected setOrCondition(
     builder: SelectQueryBuilder<Entity> | WhereExpression,
     conditions: FindCondition<Entity>[],
+    path: string,
     parentField: string,
   ) {
-    conditions.forEach((condition, index) => {
-      const method = +index ? 'andWhere' : 'where';
-      if (isObject(condition)) {
-        throw new Error();
-      }
-
-      builder[method](new Brackets((b) => this.setConditions(b, condition, parentField)));
-    });
+    conditions.forEach((condition, index) =>
+      builder[+index ? 'orWhere' : 'where'](new Brackets((b) => this.setConditions(b, condition, path, parentField))),
+    );
   }
 
   protected setSearch(
@@ -521,7 +587,6 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     searchFields: string[],
     allowedSearchFields?: string[],
   ) {
-    // const method = builder.getSql().search(/where/i) !== -1 ? 'andWhere' : 'where';
     const searchValue = `%${search}%`;
     const fields = allowedSearchFields?.length ? intersection(searchFields, allowedSearchFields) : searchFields;
 

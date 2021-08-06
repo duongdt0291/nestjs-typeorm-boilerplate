@@ -1,4 +1,4 @@
-import { UpdateResult } from 'typeorm';
+import { DefaultPageSize } from '../constant';
 import { FindManyActionDto, FindOneActionDto } from '../dto';
 import { GetPaginatedManyDefaultResponse } from '../dto/get-paginated-many-response.dto';
 import { FindCondition, QueryOptions } from '../interfaces';
@@ -37,11 +37,11 @@ export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, D
     return this.baseCreate(createDto);
   }
 
-  // abstract bulkCreate({
-  //   entities,
-  // }: {
-  //   entities: CreateDto[];
-  // }): Promise<DetailDto[]>;
+  abstract baseBulkCreate({ entities }: { entities: CreateDto[] }): Promise<DetailDto[]>;
+
+  bulkCreate({ entities }: { entities: CreateDto[] }) {
+    return this.baseBulkCreate({ entities });
+  }
 
   abstract baseUpdate(id: string | number, updateDto: UpdateDto): Promise<E>;
 
@@ -49,15 +49,15 @@ export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, D
     return this.baseUpdate(id, updateDto);
   }
 
-  abstract baseUpdateOne(criteria: FindOneActionDto<E>, updateDto: UpdateDto): Promise<E>;
+  abstract baseUpdateOne(criteria: FindOneActionDto<E>, updateDto: Partial<UpdateDto>): Promise<E>;
 
-  updateOne(criteria: FindOneActionDto<E>, updateDto: UpdateDto) {
+  updateOne(criteria: FindOneActionDto<E>, updateDto: Partial<UpdateDto>) {
     return this.baseUpdateOne(criteria, updateDto);
   }
 
-  abstract baseUpdateMany(criteria: FindOneActionDto<E>, dto: UpdateDto): Promise<UpdateResult>;
+  abstract baseUpdateMany(criteria: FindOneActionDto<E>, dto: Partial<UpdateDto>): Promise<E[]>;
 
-  async updateMany(criteria: FindOneActionDto<E>, dto: UpdateDto) {
+  async updateMany(criteria: FindOneActionDto<E>, dto: Partial<UpdateDto>) {
     return this.baseUpdateMany(criteria, dto);
   }
 
@@ -90,7 +90,7 @@ export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, D
     update: { [index: string]: number },
   ): Promise<{ success: boolean; affected: number }>;
 
-  increment(conditions: FindCondition<E>, update: { [index: string]: number }) {
+  increment(conditions: FindCondition<E>, update: { [index in keyof E]?: number }) {
     return this.baseIncrement(conditions, update);
   }
 
@@ -106,8 +106,8 @@ export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, D
   protected createPaginationBuilder<E>(
     data: E[],
     total: number,
-    limit: number,
-    page: number,
+    limit: number = DefaultPageSize,
+    page = 1,
   ): GetPaginatedManyDefaultResponse<E> {
     return {
       data,
