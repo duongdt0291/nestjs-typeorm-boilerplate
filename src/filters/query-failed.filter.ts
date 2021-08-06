@@ -9,11 +9,11 @@ export class QueryFailedFilter implements ExceptionFilter {
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const errorMessage = ConstraintErrors[exception.constraint];
-    const status =
-      exception.constraint && exception.constraint.startsWith('UQ')
-        ? HttpStatus.CONFLICT
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    const status = getStatus(exception);
+    const errorMessage = exception?.detail?.includes('is still referenced')
+      ? ConstraintErrors[`${exception.constraint}_RESTRICTED_DELETE`]
+      : ConstraintErrors[`${exception.constraint}`] || `${exception.constraint}`;
 
     response.status(status).json({
       statusCode: status,
@@ -22,3 +22,17 @@ export class QueryFailedFilter implements ExceptionFilter {
     });
   }
 }
+
+const getStatus = (exception: { constraint: string; detail: string }) => {
+  if (exception?.constraint?.startsWith('UQ')) {
+    return HttpStatus.CONFLICT;
+  }
+
+  if (exception?.constraint?.startsWith('FK')) {
+    if (exception.detail.includes('is not present in table')) return HttpStatus.NOT_FOUND;
+
+    return HttpStatus.UNPROCESSABLE_ENTITY;
+  }
+
+  return HttpStatus.INTERNAL_SERVER_ERROR;
+};
