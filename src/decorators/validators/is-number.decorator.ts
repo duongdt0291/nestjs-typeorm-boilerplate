@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsInt,
   IsNegative,
+  IsNotEmpty,
   IsNumber as IsNumberOriginal,
   IsNumberOptions,
   IsOptional,
@@ -10,6 +11,9 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { isNumber } from 'lodash';
+import { isArrayNotEmpty } from 'src/common/packages/nestjs-crud-service/utils';
+import { IsGreaterThan } from './is-greater-than.decorator';
 
 export const IsNumber = (
   {
@@ -20,6 +24,8 @@ export const IsNumber = (
     positive,
     negative,
     integer,
+    notEmpty,
+    greaterThanFields,
   }: {
     optional?: boolean;
     defaultValue?: number;
@@ -28,22 +34,16 @@ export const IsNumber = (
     positive?: boolean;
     negative?: boolean;
     integer?: boolean;
-  } = {},
+    notEmpty?: boolean;
+    greaterThanFields?: string[];
+  },
   numberOptions?: IsNumberOptions,
 ) => {
   const decorators = [];
-  if (optional) {
-    decorators.push(IsOptional());
-  }
 
-  decorators.push(
-    Transform(({ value }) => {
-      if (value) {
-        return +value;
-      }
-      return defaultValue ? defaultValue : value;
-    }),
-  );
+  if (isArrayNotEmpty(greaterThanFields)) {
+    greaterThanFields.forEach((f) => decorators.push(IsGreaterThan(f)));
+  }
 
   if (min) {
     decorators.push(Min(min));
@@ -65,5 +65,24 @@ export const IsNumber = (
     decorators.push(IsInt());
   }
 
-  return applyDecorators(...decorators, IsNumberOriginal(numberOptions));
+  decorators.push(IsNumberOriginal(numberOptions));
+
+  if (optional || isNumber(defaultValue)) {
+    decorators.push(IsOptional());
+  }
+
+  if (notEmpty) {
+    decorators.push(IsNotEmpty());
+  }
+
+  decorators.push(
+    Transform(({ value }) => {
+      if (value) {
+        return +value;
+      }
+      return defaultValue ? defaultValue : value;
+    }),
+  );
+
+  return applyDecorators(...decorators);
 };
