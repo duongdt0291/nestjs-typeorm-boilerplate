@@ -13,7 +13,7 @@ import {
 } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { DefaultPageSize } from '../constant';
-import { FindManyActionDto, FindOneActionDto, PopulateItem, SortOptions } from '../dto';
+import { FindManyActionDto, FindOneActionDto, PopulateItem, SearchType, SortOptions } from '../dto';
 import { FindCondition, MergedPopulateOptions, QueryOperator, QueryOptions, QueryPopulateOptions } from '../interfaces';
 import { ServicePopulateOptions } from '../interfaces/service-populate-options.interface';
 import { hasOwnPropName, isArrayNotEmpty } from '../utils';
@@ -127,25 +127,32 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   }
 
   baseFindOne(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
-    const builder = this.createBuilder(query, false, queryOptions);
+    const builder = this.createBuilder(query, queryOptions);
 
     return builder.getOne();
   }
 
   baseFindOneOrFail(query: FindOneActionDto<Entity>, queryOptions?: QueryOptions) {
-    const builder = this.createBuilder(query, false, queryOptions);
+    const builder = this.createBuilder(query, queryOptions);
 
     return builder.getOneOrFail();
   }
 
   baseFind(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
-    const builder = this.createBuilder(query, true, queryOptions);
+    const builder = this.createBuilder(query, queryOptions);
 
     return builder.getMany();
   }
 
-  async baseList(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
-    const builder = this.createBuilder(query, true, queryOptions);
+  count(query: FindManyActionDto<Entity>, queryOptions?: QueryOptions) {
+    const builder = this.createBuilder(query, queryOptions);
+
+    return builder.getCount();
+  }
+
+  async baseList(query: FindManyActionDto<Entity>, queryOptions: QueryOptions = {}) {
+    queryOptions.paginated = true;
+    const builder = this.createBuilder(query, queryOptions);
     const [data, total] = await builder.getManyAndCount();
 
     return this.createPaginationBuilder<Entity>(data, total, query.pageSize, query.page);
@@ -167,14 +174,20 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     return this.repository.save(merge(entity, updateDto) as Entity);
   }
 
-  async baseUpdateOne(criteria: FindOneActionDto<Entity>, updateDto: UpdateDto) {
+  async baseUpdateOneOrFail(criteria: FindOneActionDto<Entity>, updateDto: UpdateDto) {
     const entity = await this.createBuilder(criteria).getOneOrFail();
 
     return this.repository.save(merge(entity, updateDto) as Entity);
   }
 
+  async baseUpdateOne(criteria: FindOneActionDto<Entity>, updateDto: UpdateDto) {
+    const entity = await this.createBuilder(criteria).getOne();
+
+    return entity ? this.repository.save(merge(entity, updateDto) as Entity) : null;
+  }
+
   async baseUpdateMany(criteria: FindOneActionDto<Entity>, dto: UpdateDto) {
-    const entities = await this.createBuilder(criteria, false).getMany();
+    const entities = await this.createBuilder(criteria).getMany();
 
     return entities.length ? this.repository.save(entities.map((e) => merge(e, dto))) : null;
   }
@@ -186,13 +199,13 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
   }
 
   async baseDeleteOne(criteria: FindOneActionDto<Entity>) {
-    const entity = await this.createBuilder(criteria, false).getOne();
+    const entity = await this.createBuilder(criteria).getOne();
 
     return entity ? this.repository.remove(entity) : null;
   }
 
   async baseDeleteMany(criteria: FindOneActionDto<Entity>) {
-    const entities = await this.createBuilder(criteria, false).getMany();
+    const entities = await this.createBuilder(criteria).getMany();
 
     return entities.length ? this.repository.remove(entities) : null;
   }
@@ -221,7 +234,11 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
 
     const builder = this.repository.createQueryBuilder(this.tableAlias);
 
-    this.setConditions(builder, conditions);
+    if (!this.populateAliasMapper) {
+      this.setPopulateAliasMapper();
+    }
+
+    this.setConditions(builder, conditions, '', this.tableAlias, true);
 
     return builder
       .update()
@@ -237,7 +254,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
       });
   }
 
-  protected createBuilder(query: FindManyActionDto<Entity>, getMany = true, queryOptions: QueryOptions = {}) {
+  protected createBuilder(query: FindManyActionDto<Entity>, queryOptions: QueryOptions = {}) {
     const builder = this.repository.createQueryBuilder(this.tableAlias);
 
     if (!query?.where) {
@@ -263,7 +280,13 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     this.setConditions(builder, query.where);
 
     if (query.search && isArrayNotEmpty(query.searchFields)) {
-      this.setSearch(builder, query.search, query.searchFields, queryOptions?.allowedSearchFields);
+      this.setSearch(
+        builder,
+        query.search,
+        query.searchFields,
+        query.searchCriteria,
+        queryOptions?.allowedSearchFields,
+      );
     }
 
     if (queryOptions.includeDeleted && this.entityHasDeleteColumn) {
@@ -274,7 +297,7 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
       this.setSort(builder, query.sort);
     }
 
-    if (getMany) {
+    if (queryOptions?.paginated) {
       let take = query.pageSize || DefaultPageSize;
       const skip = take * ((query.page || 1) - 1);
 
@@ -339,13 +362,15 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     (builder as any)[populate.method](...args);
 
     if (populate.populates) {
-      populate.populates.forEach((p) =>
+      populate.populates.forEach((innerPopulate) => {
         this.setJoin(
-          p,
+          innerPopulate,
           builder,
-          populate && !populate.method.endsWith('Select') ? populate.tableAlias || populate.table : populate.property,
-        ),
-      );
+          populate && !populate.method.endsWith('Select')
+            ? populate.tableAlias || populate.table
+            : populate.tableAlias || populate.property,
+        );
+      });
     }
   }
 
@@ -378,6 +403,8 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     }
 
     queryPopulateOptions.forEach((queryOption) => {
+      if (!queryOption) return;
+
       const match = source.find((servicePopulateOption) => servicePopulateOption.property === queryOption.property);
 
       let childPopulates;
@@ -392,7 +419,9 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
           required: hasOwnPropName(queryOption, 'required') ? queryOption.required : match.required,
           onConditions:
             queryOption.onConditions && queryOption.onConditions !== match.onConditions
-              ? `${match.onConditions} AND (${queryOption.onConditions})`
+              ? match.onConditions
+                ? `${match.onConditions} AND (${queryOption.onConditions})`
+                : queryOption.onConditions
               : match.onConditions,
           eager: hasOwnPropName(queryOption, 'eager') ? queryOption.eager : match.eager,
           method: this.getJoinMethod(match.type),
@@ -408,21 +437,20 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     conditions: FindCondition<any> | QueryOperator<any>,
     parentPath = '',
     parentField: string = this.tableAlias,
-    hasWhere = false,
+    needSnakeCase = false, // true for increment only
   ) {
     try {
       Object.entries(conditions).forEach(([field, value]) => {
-        const method = hasWhere ? 'andWhere' : 'where';
-
         if (field === '$or') {
-          return builder[method](new Brackets((b) => this.setOrCondition(b, value, parentPath, parentField)));
+          return builder.andWhere(
+            new Brackets((b) => this.setOrCondition(b, value, parentPath, parentField, needSnakeCase)),
+          );
         }
 
         if (MapObjectOperator[field]) {
-          hasWhere = true;
           const { str, params } = this.mapOperatorsToQuery(parentField, field, value);
 
-          return builder[method](str, params);
+          return builder.andWhere(str, params);
         }
 
         const cols = parentField.split('.');
@@ -434,21 +462,22 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
             parentField = cols[1];
         }
 
+        if (needSnakeCase) field = snakeCase(field);
+
         if (isObject(value)) {
           if (this.populateAliasMapper[parentPath ? `${parentPath}.${field}` : field]) {
             field = this.populateAliasMapper[parentPath ? `${parentPath}.${field}` : field];
           }
+
           return this.setConditions(
             builder as unknown as SelectQueryBuilder<Entity>,
             value,
             parentPath ? `${parentPath}.${field}` : field,
             `${parentField}.${field}`,
-            true,
           );
         }
 
-        hasWhere = true;
-        builder[method](`${parentField}.${field} = (:${parentField}.${field})`, {
+        builder.andWhere(`${parentField}.${field} = (:${parentField}.${field})`, {
           [`${parentField}.${field}`]: value,
         });
       });
@@ -575,9 +604,12 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     conditions: FindCondition<Entity>[],
     path: string,
     parentField: string,
+    needSnakeCase?: boolean,
   ) {
     conditions.forEach((condition, index) =>
-      builder[+index ? 'orWhere' : 'where'](new Brackets((b) => this.setConditions(b, condition, path, parentField))),
+      builder[+index ? 'orWhere' : 'where'](
+        new Brackets((b) => this.setConditions(b, condition, path, parentField, needSnakeCase)),
+      ),
     );
   }
 
@@ -585,9 +617,14 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     builder: SelectQueryBuilder<Entity>,
     search: string,
     searchFields: string[],
+    searchCriteria: SearchType = SearchType.Contains,
     allowedSearchFields?: string[],
   ) {
-    const searchValue = `%${search}%`;
+    let searchValue = `%${search}%`;
+
+    if (searchCriteria === SearchType.StartWith) searchValue = `${search}%`;
+    if (searchCriteria === SearchType.EndWith) searchValue = `%${search}`;
+
     const fields = allowedSearchFields?.length ? intersection(searchFields, allowedSearchFields) : searchFields;
 
     if (!fields.length) {
@@ -597,8 +634,9 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     builder.andWhere(
       new Brackets((b) => {
         fields.forEach((field, index) => {
+          const fieldAlias = field.includes('.') ? field : `${this.tableAlias}.${field}`;
           return b[+index ? 'orWhere' : 'where'](
-            `${this.tableAlias}.${field} ${this.likeOperator} :searchValue`,
+            `${fieldAlias} ${this.likeOperator} :searchValue`,
             +index
               ? null
               : {
@@ -627,11 +665,10 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
     const sorts = Object.entries(querySort);
 
     if (sorts?.length) {
-      return sorts.forEach(([field, order], index) => {
-        if (+index) {
-          return builder.addOrderBy(`${this.tableAlias}.${field}`, order);
-        }
-        builder.orderBy(`${this.tableAlias}.${field}`, order);
+      return sorts.forEach(([field, order]) => {
+        const alias = field.includes('.') ? field : `${this.tableAlias}.${field}`;
+
+        return builder.addOrderBy(alias, order);
       });
     }
 
@@ -667,5 +704,45 @@ export class TypeOrmCrudService<Entity, CreateDto = Entity, UpdateDto = Entity> 
       entityMetadata.primaryColumns.map((prop) => prop.propertyPath) || /* istanbul ignore next */ [];
 
     return { columns, primaryColumns };
+  }
+
+  checkNeedFindAgainByIds(query: FindManyActionDto<Entity>) {
+    const { search, searchFields, where } = query;
+
+    if (search && isArrayNotEmpty(searchFields)) {
+      if (this.isSearchFieldsIncludesInnerProp(searchFields)) {
+        return true;
+      }
+    }
+
+    if (this.isWhereConditionsIncludesInnerProp(where)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  protected isWhereConditionsIncludesInnerProp(where: FindCondition<Entity>) {
+    for (const v1 of Object.values(where)) {
+      if (typeof v1 === 'object') {
+        for (const v2 of Object.values(v1)) {
+          // TECHNICAL DEBT: check when key1 = $or
+          if (typeof v2 === 'string' && !MapObjectOperator[v2]) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  protected isSearchFieldsIncludesInnerProp(searchFields: string[]) {
+    for (const field of searchFields) {
+      if (field.includes('.')) {
+        return true;
+      }
+    }
+    return false;
   }
 }

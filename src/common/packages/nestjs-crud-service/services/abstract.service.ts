@@ -55,6 +55,12 @@ export abstract class AbstractService<E, CreateDto = E, UpdateDto = CreateDto, D
     return this.baseUpdateOne(criteria, updateDto);
   }
 
+  abstract baseUpdateOneOrFail(criteria: FindOneActionDto<E>, updateDto: Partial<UpdateDto>): Promise<E>;
+
+  updateOneOrFail(criteria: FindOneActionDto<E>, updateDto: Partial<UpdateDto>) {
+    return this.baseUpdateOneOrFail(criteria, updateDto);
+  }
+
   abstract baseUpdateMany(criteria: FindOneActionDto<E>, dto: Partial<UpdateDto>): Promise<E[]>;
 
   async updateMany(criteria: FindOneActionDto<E>, dto: Partial<UpdateDto>) {

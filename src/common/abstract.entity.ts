@@ -4,17 +4,17 @@ import { CreateDateColumn, PrimaryGeneratedColumn, UpdateDateColumn } from 'type
 
 export abstract class AbstractEntity {
   @ApiProperty()
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   @AutoMap()
-  id: number;
+  id?: string;
 
   @ApiProperty()
-  @CreateDateColumn({ update: false })
+  @CreateDateColumn({ update: false, type: 'timestamp with time zone' })
   @AutoMap()
-  createdAt: Date;
+  createdAt?: Date;
 
   @ApiProperty()
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamp with time zone' })
   @AutoMap()
-  updatedAt: Date;
+  updatedAt?: Date;
 }

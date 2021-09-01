@@ -26,6 +26,11 @@ export interface QueryOptions {
    * explicit select hidden fields, which has @Column options select: false in entity
    */
   includeHiddenFields?: string[];
+
+  /*
+   * Explicit required pagination for find method
+   */
+  paginated?: boolean;
 }
 
 export interface QueryPopulateOptions {

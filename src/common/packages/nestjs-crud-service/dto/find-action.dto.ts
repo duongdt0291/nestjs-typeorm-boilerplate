@@ -31,15 +31,16 @@ export class FindOneActionDto<E> {
   @IsArray()
   @IsOptional()
   @Transform(({ value }) => {
-    if (!value) return;
-
-    return value.map((e) => JSON.parse(e));
+    return typeof value === 'string' ? JSON.parse(value) : value;
   })
   populates?: PopulateItem[];
 
   @ApiPropertyOptional()
   @IsArray({})
   @IsOptional()
+  @Transform(({ value }) => {
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  })
   fields?: string[];
 
   @ApiPropertyOptional()
@@ -53,6 +54,10 @@ export class FindOneActionDto<E> {
   @ApiPropertyOptional()
   @IsArray()
   @IsOptional()
+  // TECHNICAL DEBT: make transform json string a decorator
+  @Transform(({ value }) => {
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  })
   searchFields?: string[];
 
   @ApiPropertyOptional({ enum: SearchType })
