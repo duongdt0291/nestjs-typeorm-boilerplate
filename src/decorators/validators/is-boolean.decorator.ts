@@ -7,17 +7,16 @@ export const IsBoolean = (
     convert,
     defaultValue,
   }: {
-    convert?: boolean;
-    defaultValue?: boolean;
-  } = {},
+    convert: boolean;
+    defaultValue?: string;
+  },
   options?: ValidationOptions,
 ) =>
   applyDecorators(
     Transform(({ value }) => {
       let v = value || defaultValue;
-      if (convert) {
-        v = Boolean(v);
-      }
+
+      if (convert) v = Boolean(v);
 
       return v;
     }),

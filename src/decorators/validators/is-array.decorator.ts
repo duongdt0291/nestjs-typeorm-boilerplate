@@ -7,6 +7,7 @@ import {
   ArrayUniqueIdentifier,
   IsArray as IsArrayOriginal,
   IsNotEmpty,
+  IsOptional,
   ValidateNested,
   ValidationOptions,
 } from 'class-validator';
@@ -14,6 +15,7 @@ import { isArrayNotEmpty } from 'src/common/packages/nestjs-crud-service/utils';
 
 export const IsArray = (
   {
+    optional,
     notEmpty,
     minSize,
     maxSize,
@@ -21,10 +23,11 @@ export const IsArray = (
     nestedValidate,
     nestedType,
   }: {
-    notEmpty: boolean;
+    optional?: boolean;
+    notEmpty?: boolean;
     minSize?: number;
     maxSize?: number;
-    unique: ArrayUniqueIdentifier[];
+    unique?: ArrayUniqueIdentifier[];
     nestedValidate?: boolean;
     nestedType?: any;
   },
@@ -54,6 +57,10 @@ export const IsArray = (
     if (nestedType) {
       decorators.push(Type(() => nestedType));
     }
+  }
+
+  if (optional) {
+    decorators.push(IsOptional());
   }
 
   return applyDecorators(...decorators, IsArrayOriginal(options));

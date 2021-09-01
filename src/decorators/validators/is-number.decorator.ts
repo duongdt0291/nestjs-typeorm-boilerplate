@@ -25,7 +25,7 @@ export const IsNumber = (
     negative,
     integer,
     notEmpty,
-    greaterThanFields,
+    greaterThan,
   }: {
     optional?: boolean;
     defaultValue?: number;
@@ -35,14 +35,14 @@ export const IsNumber = (
     negative?: boolean;
     integer?: boolean;
     notEmpty?: boolean;
-    greaterThanFields?: string[];
+    greaterThan?: string[];
   },
   numberOptions?: IsNumberOptions,
 ) => {
   const decorators = [];
 
-  if (isArrayNotEmpty(greaterThanFields)) {
-    greaterThanFields.forEach((f) => decorators.push(IsGreaterThan(f)));
+  if (isArrayNotEmpty(greaterThan)) {
+    greaterThan.forEach((f) => decorators.push(IsGreaterThan(f)));
   }
 
   if (min) {

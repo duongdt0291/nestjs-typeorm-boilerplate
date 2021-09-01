@@ -1,6 +1,7 @@
 import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import {
+  IsNotEmpty,
   IsOptional,
   IsString as IsStringOriginal,
   Matches,
@@ -15,15 +16,16 @@ export const IsString = (
     defaultValue?: string;
     minLength?: number;
     maxLength?: number;
-    pattern?: string;
+    pattern?: RegExp;
     trim?: boolean;
     lowercase?: boolean;
+    notEmpty?: boolean;
   } = {},
   stringOptions?: ValidationOptions,
 ) => {
   const decorators = [];
 
-  const { optional, defaultValue, minLength, maxLength, pattern, trim, lowercase } = Object.assign(
+  const { optional, defaultValue, minLength, maxLength, pattern, trim, lowercase, notEmpty } = Object.assign(
     { trim: true },
     options,
   );
@@ -31,9 +33,13 @@ export const IsString = (
   if (optional) {
     decorators.push(IsOptional());
   }
+
   decorators.push(
     Transform(({ value }) => {
-      let v = String(value) || defaultValue;
+      if (stringOptions?.each) return value;
+
+      let v = value || typeof value === 'string' ? String(value) : defaultValue;
+
       if (!v) {
         return v;
       }
@@ -45,7 +51,6 @@ export const IsString = (
       if (lowercase) {
         v = v.toLowerCase();
       }
-
       return v;
     }),
   );
@@ -60,6 +65,10 @@ export const IsString = (
 
   if (maxLength) {
     decorators.push(MaxLength(maxLength));
+  }
+
+  if (notEmpty) {
+    decorators.push(IsNotEmpty());
   }
 
   return applyDecorators(...decorators, IsStringOriginal(stringOptions));
